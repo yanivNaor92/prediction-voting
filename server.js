@@ -13,39 +13,28 @@ app.prepare().then(() => {
     handle(req, res, parsedUrl);
   });
 
-  // Updated Socket.IO configuration
-  const io = new Server(server, {
-    path: '/api/socketio',
-    addTrailingSlash: false,
-    cors: {
-      origin: "*",
-      methods: ["GET", "POST"],
-      allowedHeaders: ["Content-Type"]
-    },
-    transports: ['websocket', 'polling']
-  });
+  const io = new Server(server);
 
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
-    socket.on('vote', async (data) => {
-      try {
-        console.log('Vote received:', data);
-        io.emit('vote-update', data);
-      } catch (error) {
-        console.error('Error in vote handler:', error);
-      }
+    socket.on('vote', (data) => {
+      console.log('Vote received:', data);
+      io.emit('vote-update', data);
     });
 
-    socket.on('show-results', () => {
-      io.emit('show-results-update');
+    socket.on('show-results', (data) => {
+      console.log('Show results requested:', data);
+      io.emit('show-results-update', data);
     });
 
     socket.on('next-question', (index) => {
+      console.log('Next question requested:', index);
       io.emit('next-question-update', index);
     });
 
     socket.on('reset-session', (data) => {
+      console.log('Reset session requested:', data);
       io.emit('reset-session-update', data);
     });
 
@@ -55,11 +44,7 @@ app.prepare().then(() => {
   });
 
   const PORT = process.env.PORT || 3000;
-  server.listen(PORT, (err) => {
-    if (err) throw err;
+  server.listen(PORT, () => {
     console.log(`> Ready on http://localhost:${PORT}`);
   });
-}).catch((err) => {
-  console.error('Error starting server:', err);
-  process.exit(1);
 });

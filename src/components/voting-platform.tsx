@@ -45,22 +45,6 @@ export default function VotingPlatform() {
   const [showResults, setShowResults] = useState(false);
   const [userVotes, setUserVotes] = useState<Record<number, string>>({});
 
-  const fetchQuestions = async () => {
-    try {
-      const response = await fetch('/api/questions');
-      if (!response.ok) throw new Error('Failed to fetch questions');
-      const data = await response.json();
-      return data.map((q: Question) => ({
-        ...q,
-        options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
-        votes: typeof q.votes === 'string' ? JSON.parse(q.votes) : q.votes
-      }));
-    } catch (error) {
-      console.error('Error fetching questions:', error);
-      return initialQuestions;
-    }
-  };
-
   const updateQuestionVotes = async (question: Question) => {
     try {
       const response = await fetch('/api/questions', {
@@ -85,40 +69,45 @@ export default function VotingPlatform() {
 
   useEffect(() => {
     let mounted = true;
-
+    let socketInstance: Socket | null = null;
+  
     const initialize = async () => {
       try {
-        const loadedQuestions = await fetchQuestions();
-        if (mounted) {
-          setQuestions(loadedQuestions);
-        }
-
-        const socketInstance = await connectSocket();
+        socketInstance = await connectSocket();
         if (!mounted) return;
-
+  
         setSocket(socketInstance);
-
-        socketInstance.on('vote-update', (data) => {
+  
+        socketInstance.on('show-results-update', (data) => {
+          console.log('Received show results update:', data);
           if (mounted) {
-            console.log('Received vote update:', data);
+            setShowResults(true);
+            if (data?.questions) {
+              setQuestions(data.questions);
+            }
+            if (typeof data?.currentQuestionIndex !== 'undefined') {
+              setCurrentQuestionIndex(data.currentQuestionIndex);
+            }
+          }
+        });
+  
+        socketInstance.on('vote-update', (data) => {
+          console.log('Received vote update:', data);
+          if (mounted && data?.questions) {
             setQuestions(data.questions);
           }
         });
-
-        socketInstance.on('show-results-update', () => {
-          if (mounted) {
-            setShowResults(true);
-          }
-        });
-
+  
         socketInstance.on('next-question-update', (index) => {
+          console.log('Received next question update:', index);
           if (mounted) {
             setCurrentQuestionIndex(index);
             setShowResults(false);
           }
         });
-
+  
         socketInstance.on('reset-session-update', (data) => {
+          console.log('Received reset session update:', data);
           if (mounted) {
             setQuestions(data.questions);
             setCurrentQuestionIndex(0);
@@ -126,28 +115,33 @@ export default function VotingPlatform() {
             setUserVotes({});
           }
         });
+  
+        socketInstance.on('disconnect', () => {
+          console.log('Socket disconnected');
+        });
+  
+        socketInstance.on('connect_error', (error) => {
+          console.error('Socket connection error:', error);
+        });
+  
       } catch (error) {
-        console.error('Initialization error:', error);
+        console.error('Socket initialization error:', error);
       }
     };
-
+  
     initialize();
-
+  
     return () => {
-      mounted = false;
-      if (socket) {
-        socket.off('vote-update');
-        socket.off('show-results-update');
-        socket.off('next-question-update');
-        socket.off('reset-session-update');
-        socket.disconnect();
-      }
-    };
-    }, [socket]);
+        mounted = false;
+        if (socketInstance) {
+          socketInstance.disconnect();
+        }
+      };
+    }, []);
 
   const handleVote = async (option: string) => {
     if (!currentQuestion || userVotes[currentQuestion.id] || !socket) return;
-
+  
     try {
       const updatedQuestions = questions.map(q => {
         if (q.id === currentQuestion.id) {
@@ -161,14 +155,21 @@ export default function VotingPlatform() {
         }
         return q;
       });
-
+  
+      console.log('Sending vote update:', {
+        questions: updatedQuestions,
+        currentQuestionIndex,
+        option
+      });
+  
       await updateQuestionVotes(updatedQuestions[currentQuestionIndex]);
       setQuestions(updatedQuestions);
       setUserVotes({ ...userVotes, [currentQuestion.id]: option });
-
+  
       socket.emit('vote', {
         questions: updatedQuestions,
-        currentQuestionIndex
+        currentQuestionIndex,
+        votedOption: option
       });
     } catch (error) {
       console.error('Failed to save vote:', error);
@@ -178,8 +179,22 @@ export default function VotingPlatform() {
 
   const handleShowResults = () => {
     if (!socket) return;
+    
+    // First update local state
     setShowResults(true);
-    socket.emit('show-results');
+    
+    // Then emit to all clients with the current state
+    socket.emit('show-results', {
+      showResults: true,
+      questions,
+      currentQuestionIndex
+    });
+    
+    console.log('Admin showing results, emitting state:', {
+      showResults: true,
+      questions,
+      currentQuestionIndex
+    });
   };
 
   const handleNextQuestion = () => {
