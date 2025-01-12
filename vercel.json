@@ -1,0 +1,11 @@
+{
+    "version": 2,
+    "framework": "nextjs",
+    "regions": ["fra1"],
+    "functions": {
+      "api/socket": {
+        "memory": 1024,
+        "maxDuration": 10
+      }
+    }
+  }

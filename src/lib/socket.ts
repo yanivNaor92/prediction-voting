@@ -1,5 +1,3 @@
-"use client";
-
 import { io, Socket } from "socket.io-client";
 
 let socket: Socket | null = null;
@@ -8,15 +6,16 @@ export const connectSocket = async (): Promise<Socket> => {
   return new Promise((resolve, reject) => {
     try {
       if (!socket) {
-        socket = io('http://localhost:3000', {
-          transports: ['websocket'],
-          reconnectionAttempts: 10,
-          reconnectionDelay: 1000,
-          autoConnect: true,
+        socket = io(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000', {
+          path: '/api/socketio',
+          addTrailingSlash: false,
+          transports: ['websocket', 'polling'],
+          reconnectionDelayMax: 10000,
+          reconnectionAttempts: 10
         });
 
         socket.on('connect', () => {
-          console.log('Socket connected successfully');
+          console.log('Socket connected successfully:', socket?.id);
           resolve(socket!);
         });
 
@@ -25,8 +24,12 @@ export const connectSocket = async (): Promise<Socket> => {
           reject(error);
         });
 
-        socket.on('disconnect', () => {
-          console.log('Socket disconnected');
+        socket.on('disconnect', (reason) => {
+          console.log('Socket disconnected:', reason);
+        });
+
+        socket.on('error', (error) => {
+          console.error('Socket error:', error);
         });
       } else {
         resolve(socket);

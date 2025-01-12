@@ -6,41 +6,36 @@ import { Socket } from 'socket.io-client';
 import { useUser } from './user-context';
 import LoginScreen from './login-screen';
 import { connectSocket } from '@/lib/socket';
-
-type Question = {
-  id: number;
-  title: string;
-  description: string;
-  options: string[];
-  votes: Record<string, number>;
-};
+import { Question } from '@/lib/types';
 
 const initialQuestions: Question[] = [
-  {
-    id: 1,
-    title: "2024 Tech Trends",
-    description: "What will be the most impactful technology in 2024?",
-    options: ["AI", "Quantum Computing", "AR/VR", "Blockchain"],
-    votes: {
-      "AI": 0,
-      "Quantum Computing": 0,
-      "AR/VR": 0,
-      "Blockchain": 0
+    {
+      id: 1,
+      title: "2024 Tech Trends",
+      description: "What will be the most impactful technology in 2024?",
+      options: ["AI", "Quantum Computing", "AR/VR", "Blockchain"],
+      votes: {
+        "AI": 0,
+        "Quantum Computing": 0,
+        "AR/VR": 0,
+        "Blockchain": 0
+      },
+      order: 0
+    },
+    {
+      id: 2,
+      title: "Future of Work",
+      description: "How will most people work in 2025?",
+      options: ["Remote", "Hybrid", "Office", "AI-Assisted"],
+      votes: {
+        "Remote": 0,
+        "Hybrid": 0,
+        "Office": 0,
+        "AI-Assisted": 0
+      },
+      order: 1
     }
-  },
-  {
-    id: 2,
-    title: "Future of Work",
-    description: "How will most people work in 2025?",
-    options: ["Remote", "Hybrid", "Office", "AI-Assisted"],
-    votes: {
-      "Remote": 0,
-      "Hybrid": 0,
-      "Office": 0,
-      "AI-Assisted": 0
-    }
-  }
-];
+  ];
 
 export default function VotingPlatform() {
   const { user, logout } = useUser();
@@ -55,7 +50,7 @@ export default function VotingPlatform() {
       const response = await fetch('/api/questions');
       if (!response.ok) throw new Error('Failed to fetch questions');
       const data = await response.json();
-      return data.map((q: any) => ({
+      return data.map((q: Question) => ({
         ...q,
         options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
         votes: typeof q.votes === 'string' ? JSON.parse(q.votes) : q.votes
@@ -148,7 +143,7 @@ export default function VotingPlatform() {
         socket.disconnect();
       }
     };
-  }, []);
+    }, [socket]);
 
   const handleVote = async (option: string) => {
     if (!currentQuestion || userVotes[currentQuestion.id] || !socket) return;
@@ -311,7 +306,7 @@ export default function VotingPlatform() {
                     <button
                       key={option}
                       onClick={() => handleVote(option)}
-                      disabled={userVotes[currentQuestion.id] || showResults}
+                      disabled={Boolean(userVotes[currentQuestion.id]) || showResults}
                       className={`p-4 rounded text-center transition-colors font-medium ${
                         userVotes[currentQuestion.id] === option
                           ? 'bg-blue-600 text-white'

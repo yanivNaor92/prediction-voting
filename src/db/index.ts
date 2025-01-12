@@ -1,12 +1,14 @@
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import Database from 'better-sqlite3';
-import { questions } from './schema';
 
-// Use relative path for database file
-const sqlite = new Database('./voting.db');
+interface CountResult {
+  count: number;
+}
+
+const sqlite = new Database('voting.db');
 export const db = drizzle(sqlite);
 
-export const initializeDb = async () => {
+export const initializeDb = () => {
   try {
     sqlite.exec(`
       CREATE TABLE IF NOT EXISTS questions (
@@ -21,7 +23,8 @@ export const initializeDb = async () => {
     `);
 
     // Check if table is empty and insert initial data if needed
-    const count = sqlite.prepare('SELECT COUNT(*) as count FROM questions').get();
+    const count = sqlite.prepare('SELECT COUNT(*) as count FROM questions').get() as CountResult;
+    
     if (count.count === 0) {
       console.log('Inserting initial questions...');
       const initialQuestions = [
@@ -51,12 +54,16 @@ export const initializeDb = async () => {
         }
       ];
 
+      const insertStmt = sqlite.prepare(`
+        INSERT INTO questions (title, description, options, votes, \`order\`)
+        VALUES (@title, @description, @options, @votes, @order)
+      `);
+
       initialQuestions.forEach(q => {
-        sqlite.prepare(`
-          INSERT INTO questions (title, description, options, votes, \`order\`)
-          VALUES (@title, @description, @options, @votes, @order)
-        `).run(q);
+        insertStmt.run(q);
       });
+
+      console.log('Initial questions inserted successfully');
     }
   } catch (error) {
     console.error('Database initialization error:', error);

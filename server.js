@@ -2,17 +2,10 @@ const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
 const { Server } = require('socket.io');
-const path = require('path');
 
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
 const handle = app.getRequestHandler();
-
-// Import database initialization from JS file
-const { initializeDb } = require('./src/db/db');
-
-// Initialize database
-initializeDb();
 
 app.prepare().then(() => {
   const server = createServer((req, res) => {
@@ -20,11 +13,16 @@ app.prepare().then(() => {
     handle(req, res, parsedUrl);
   });
 
+  // Updated Socket.IO configuration
   const io = new Server(server, {
+    path: '/api/socketio',
+    addTrailingSlash: false,
     cors: {
       origin: "*",
-      methods: ["GET", "POST"]
-    }
+      methods: ["GET", "POST"],
+      allowedHeaders: ["Content-Type"]
+    },
+    transports: ['websocket', 'polling']
   });
 
   io.on('connection', (socket) => {
@@ -35,47 +33,24 @@ app.prepare().then(() => {
         console.log('Vote received:', data);
         io.emit('vote-update', data);
       } catch (error) {
-        console.error('Error handling vote:', error);
-        socket.emit('error', { message: 'Failed to process vote' });
+        console.error('Error in vote handler:', error);
       }
     });
 
     socket.on('show-results', () => {
-      try {
-        console.log('Showing results');
-        io.emit('show-results-update');
-      } catch (error) {
-        console.error('Error showing results:', error);
-        socket.emit('error', { message: 'Failed to show results' });
-      }
+      io.emit('show-results-update');
     });
 
     socket.on('next-question', (index) => {
-      try {
-        console.log('Moving to next question:', index);
-        io.emit('next-question-update', index);
-      } catch (error) {
-        console.error('Error changing question:', error);
-        socket.emit('error', { message: 'Failed to change question' });
-      }
+      io.emit('next-question-update', index);
     });
 
-    socket.on('reset-session', async (data) => {
-      try {
-        console.log('Resetting session');
-        io.emit('reset-session-update', data);
-      } catch (error) {
-        console.error('Error resetting session:', error);
-        socket.emit('error', { message: 'Failed to reset session' });
-      }
+    socket.on('reset-session', (data) => {
+      io.emit('reset-session-update', data);
     });
 
     socket.on('disconnect', () => {
       console.log('Client disconnected:', socket.id);
-    });
-
-    socket.on('error', (error) => {
-      console.error('Socket error:', error);
     });
   });
 

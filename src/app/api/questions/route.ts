@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db/db';
+import { Question, DBQuestion } from '@/lib/types'
 
-const initialQuestions = [
+const initialQuestions: Question[] = [
   {
     id: 1,
     title: "2024 Tech Trends",
@@ -12,7 +13,8 @@ const initialQuestions = [
       "Quantum Computing": 0,
       "AR/VR": 0,
       "Blockchain": 0
-    }
+    },
+    order: 0
   },
   {
     id: 2,
@@ -24,20 +26,21 @@ const initialQuestions = [
       "Hybrid": 0,
       "Office": 0,
       "AI-Assisted": 0
-    }
+    },
+    order: 1
   }
 ];
 
 export async function GET() {
   try {
     const stmt = db.prepare('SELECT * FROM questions ORDER BY `order`');
-    const questions = stmt.all();
+    const questions = stmt.all() as DBQuestion[];
 
     if (questions.length === 0) {
       return NextResponse.json(initialQuestions);
     }
 
-    const parsedQuestions = questions.map(q => ({
+    const parsedQuestions = questions.map((q: DBQuestion) => ({
       ...q,
       options: JSON.parse(q.options),
       votes: JSON.parse(q.votes)

@@ -1,35 +1,48 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { initSocket } from '@/lib/socket';
+import { Socket } from 'socket.io-client';
+import { connectSocket } from '@/lib/socket';
 
-const SocketContext = createContext(null);
+interface SocketContextType {
+  socket: Socket | null;
+}
 
-export const SocketProvider = ({ children }) => {
-  const [socket, setSocket] = useState(null);
+const SocketContext = createContext<SocketContextType | null>(null);
+
+export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
+  const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
-    const socketInstance = initSocket();
-    setSocket(socketInstance);
+    const initSocket = async () => {
+      try {
+        const socketInstance = await connectSocket();
+        setSocket(socketInstance);
+      } catch (error) {
+        console.error('Failed to initialize socket:', error);
+      }
+    };
+
+    initSocket();
 
     return () => {
-      if (socketInstance) {
-        socketInstance.disconnect();
+      if (socket) {
+        socket.disconnect();
       }
     };
   }, []);
 
   return (
-    <SocketContext.Provider value={socket}>
+    <SocketContext.Provider value={{ socket }}>
       {children}
     </SocketContext.Provider>
   );
 };
 
 export const useSocket = () => {
-  const socket = useContext(SocketContext);
-  if (!socket) {
+  const context = useContext(SocketContext);
+  if (!context) {
     throw new Error('useSocket must be used within a SocketProvider');
   }
-  return socket;
+  return context.socket;
 };
