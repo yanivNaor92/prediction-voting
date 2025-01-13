@@ -242,7 +242,7 @@ export default function VotingPlatform() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Prediction Voting Platform</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Prediction Voting Platform Test</h1>
           <div className="flex items-center gap-4">
             <span className="text-gray-600">
               Welcome, {user.name}
