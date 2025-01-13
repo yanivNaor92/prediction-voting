@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../lib/prisma';
+import { Question } from '@prisma/client';
 
 export async function PUT(request: Request) {
   try {
@@ -25,13 +26,19 @@ export async function GET() {
       orderBy: { order: 'asc' }
     });
 
-    return NextResponse.json(questions.map(q => ({
-      ...q,
-      options: JSON.parse(q.options),
-      votes: JSON.parse(q.votes)
-    })));
+    // "q" is recognized as a "Question"
+    return NextResponse.json(
+      questions.map((q: Question) => ({
+        ...q,
+        options: JSON.parse(q.options),
+        votes: JSON.parse(q.votes)
+      }))
+    );
   } catch (error) {
     console.error('Failed to fetch questions:', error);
-    return NextResponse.json({ error: 'Failed to fetch questions' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch questions' },
+      { status: 500 }
+    );
   }
 }
