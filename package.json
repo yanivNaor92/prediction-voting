@@ -10,16 +10,16 @@
     "postinstall": "prisma generate"
   },
   "prisma": {
-  "seed": "ts-node prisma/seed.js"
-},
+    "seed": "ts-node prisma/seed.js"
+  },
   "dependencies": {
-    "@vercel/postgres": "^0.10.0",
     "@prisma/client": "^6.2.1",
-    "prisma": "^4.0.0",
+    "@vercel/postgres": "^0.10.0",
     "better-sqlite3": "^11.7.2",
     "bufferutil": "^4.0.9",
     "drizzle-orm": "^0.38.3",
     "next": "15.1.4",
+    "prisma": "^6.2.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.0",
