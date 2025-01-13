@@ -14,11 +14,7 @@ app.prepare().then(() => {
   });
 
   const io = new Server(server, {
-    path: '/api/socket',
-    cors: {
-      origin: '*',
-      methods: ['GET', 'POST'],
-    }
+    path: '/api/socket'
   });
 
   io.on('connection', (socket) => {
