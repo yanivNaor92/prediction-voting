@@ -6,11 +6,6 @@ const nextConfig = {
       'bufferutil': 'commonjs bufferutil',
     });
     return config;
-  },
-  experimental: {
-    serverActions: {
-      allowedOrigins: ['localhost:3000']
-    }
   }
 };
 
