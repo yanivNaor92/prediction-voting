@@ -14,7 +14,7 @@ app.prepare().then(() => {
   });
 
   const io = new Server(server, {
-    path: '/api/socket'
+    path: '/api/socket',
   });
 
   io.on('connection', (socket) => {

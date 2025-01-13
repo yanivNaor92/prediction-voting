@@ -5,7 +5,9 @@ let socket: Socket | null = null;
 export const connectSocket = async (): Promise<Socket> => {
   return new Promise((resolve) => {
     if (!socket) {
-      socket = io();
+      socket = io({
+        path: '/api/socket',
+      });
       
       socket.on('connect', () => {
         console.log('Socket connected');
