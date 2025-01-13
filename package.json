@@ -10,7 +10,7 @@
     "postinstall": "prisma generate"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.js"
+    "seed": "node prisma/seed.js"
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",
