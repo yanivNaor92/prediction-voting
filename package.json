@@ -12,7 +12,7 @@
   "seed": "ts-node prisma/seed.js"
 },
   "dependencies": {
-    "@vercel/postgres": "^0.5.1",
+    "@vercel/postgres": "^0.10.0",
     "@prisma/client": "^6.2.1",
     "better-sqlite3": "^11.7.2",
     "bufferutil": "^4.0.9",
