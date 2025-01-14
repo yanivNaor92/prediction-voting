@@ -20,6 +20,8 @@
     "drizzle-orm": "^0.38.3",
     "next": "15.1.4",
     "prisma": "^6.2.1",
+    "pusher": "^5.2.0",
+    "pusher-js": "^8.4.0-rc2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.0",
