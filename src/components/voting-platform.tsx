@@ -2,11 +2,28 @@
 
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Socket } from 'socket.io-client';
 import { useUser } from './user-context';
 import LoginScreen from './login-screen';
-import { connectSocket } from '@/lib/socket';
 import { Question } from '@/lib/types';
+import { pusherClient } from '@/lib/pusher';
+
+type VoteUpdateData = {
+  questions: Question[];
+  currentQuestionIndex: number;
+};
+
+type ShowResultsData = {
+  questions: Question[];
+  currentQuestionIndex: number;
+};
+
+type NextQuestionData = {
+  index: number;
+};
+
+type ResetSessionData = {
+  questions: Question[];
+};
 
 const initialQuestions: Question[] = [
     {
@@ -39,109 +56,45 @@ const initialQuestions: Question[] = [
 
 export default function VotingPlatform() {
   const { user, logout } = useUser();
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [questions, setQuestions] = useState<Question[]>(initialQuestions);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showResults, setShowResults] = useState(false);
   const [userVotes, setUserVotes] = useState<Record<number, string>>({});
 
-  const updateQuestionVotes = async (question: Question) => {
-    try {
-      const response = await fetch('/api/questions', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(question)
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update votes');
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Error updating votes:', error);
-      throw error;
-    }
-  };
-
   useEffect(() => {
-    let mounted = true;
-    let socketInstance: Socket | null = null;
-  
-    const initialize = async () => {
-      try {
-        socketInstance = await connectSocket();
-        if (!mounted) return;
-  
-        setSocket(socketInstance);
-  
-        socketInstance.on('show-results-update', (data) => {
-          console.log('Received show results update:', data);
-          if (mounted) {
-            setShowResults(true);
-            if (data?.questions) {
-              setQuestions(data.questions);
-            }
-            if (typeof data?.currentQuestionIndex !== 'undefined') {
-              setCurrentQuestionIndex(data.currentQuestionIndex);
-            }
-          }
-        });
-  
-        socketInstance.on('vote-update', (data) => {
-          console.log('Received vote update:', data);
-          if (mounted && data?.questions) {
-            setQuestions(data.questions);
-          }
-        });
-  
-        socketInstance.on('next-question-update', (index) => {
-          console.log('Received next question update:', index);
-          if (mounted) {
-            setCurrentQuestionIndex(index);
-            setShowResults(false);
-          }
-        });
-  
-        socketInstance.on('reset-session-update', (data) => {
-          console.log('Received reset session update:', data);
-          if (mounted) {
-            setQuestions(data.questions);
-            setCurrentQuestionIndex(0);
-            setShowResults(false);
-            setUserVotes({});
-          }
-        });
-  
-        socketInstance.on('disconnect', () => {
-          console.log('Socket disconnected');
-        });
-  
-        socketInstance.on('connect_error', (error) => {
-          console.error('Socket connection error:', error);
-        });
-  
-      } catch (error) {
-        console.error('Socket initialization error:', error);
+    const channel = pusherClient.subscribe('voting-channel');
+
+    channel.bind('vote-update', (data: VoteUpdateData) => {
+      setQuestions(data.questions);
+    });
+
+    channel.bind('show-results', (data: ShowResultsData) => {
+      setShowResults(true);
+      if (data.questions) {
+        setQuestions(data.questions);
       }
-    };
-  
-    initialize();
-  
+    });
+
+    channel.bind('next-question', (data: NextQuestionData) => {
+      setCurrentQuestionIndex(data.index);
+      setShowResults(false);
+    });
+
+    channel.bind('reset-session', (data: ResetSessionData) => {
+      setQuestions(data.questions);
+      setCurrentQuestionIndex(0);
+      setShowResults(false);
+      setUserVotes({});
+    });
+
     return () => {
-        mounted = false;
-        if (socketInstance) {
-          socketInstance.disconnect();
-        }
-      };
-    }, []);
+      pusherClient.unsubscribe('voting-channel');
+    };
+  }, []);
 
   const handleVote = async (option: string) => {
-    if (!currentQuestion || userVotes[currentQuestion.id] || !socket) return;
-  
+    if (!currentQuestion || userVotes[currentQuestion.id]) return;
+
     try {
       const updatedQuestions = questions.map(q => {
         if (q.id === currentQuestion.id) {
@@ -155,80 +108,70 @@ export default function VotingPlatform() {
         }
         return q;
       });
-  
-      console.log('Sending vote update:', {
-        questions: updatedQuestions,
-        currentQuestionIndex,
-        option
+
+      await fetch('/api/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questions: updatedQuestions,
+          currentQuestionIndex
+        }),
       });
-  
-      await updateQuestionVotes(updatedQuestions[currentQuestionIndex]);
+
       setQuestions(updatedQuestions);
       setUserVotes({ ...userVotes, [currentQuestion.id]: option });
-  
-      socket.emit('vote', {
-        questions: updatedQuestions,
-        currentQuestionIndex,
-        votedOption: option
-      });
     } catch (error) {
       console.error('Failed to save vote:', error);
       alert('Failed to save your vote. Please try again.');
     }
   };
 
-  const handleShowResults = () => {
-    if (!socket) return;
-    
-    // First update local state
-    setShowResults(true);
-    
-    // Then emit to all clients with the current state
-    socket.emit('show-results', {
-      showResults: true,
-      questions,
-      currentQuestionIndex
-    });
-    
-    console.log('Admin showing results, emitting state:', {
-      showResults: true,
-      questions,
-      currentQuestionIndex
-    });
+  const handleShowResults = async () => {
+    try {
+      await fetch('/api/show-results', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questions,
+          currentQuestionIndex
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to show results:', error);
+    }
   };
 
-  const handleNextQuestion = () => {
-    if (!socket) return;
-    if (currentQuestionIndex < questions.length - 1) {
-      const newIndex = currentQuestionIndex + 1;
-      setCurrentQuestionIndex(newIndex);
-      setShowResults(false);
-      socket.emit('next-question', newIndex);
+  const handleNextQuestion = async () => {
+    if (currentQuestionIndex >= questions.length - 1) return;
+
+    try {
+      const nextIndex = currentQuestionIndex + 1;
+      await fetch('/api/next-question', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ index: nextIndex }),
+      });
+    } catch (error) {
+      console.error('Failed to move to next question:', error);
     }
   };
 
   const handleReset = async () => {
-    if (!socket) return;
-    if (window.confirm('Are you sure you want to reset all votes and start over?')) {
+    if (!window.confirm('Are you sure you want to reset the session?')) return;
+
+    try {
       const resetQuestions = questions.map(q => ({
         ...q,
         votes: Object.fromEntries(q.options.map(opt => [opt, 0]))
       }));
 
-      try {
-        await Promise.all(resetQuestions.map(updateQuestionVotes));
-        setQuestions(resetQuestions);
-        setUserVotes({});
-        setCurrentQuestionIndex(0);
-        setShowResults(false);
-        
-        socket.emit('reset-session', {
-          questions: resetQuestions
-        });
-      } catch (error) {
-        console.error('Failed to reset session:', error);
-        alert('Failed to reset session. Please try again.');
-      }
+      await fetch('/api/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questions: resetQuestions }),
+      });
+    } catch (error) {
+      console.error('Failed to reset session:', error);
     }
   };
 
